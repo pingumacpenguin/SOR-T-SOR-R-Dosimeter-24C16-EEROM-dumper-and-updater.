@@ -1,9 +1,9 @@
 // --------------------------------------
-// Modified i2c_scanner to find, dump and update a SOR/T SOR/R Dosimeter 24C16 EEPROM 
+// Modified i2c_scanner to find, dump and update a SOR/T SOR/R  Dosimeter 24C16 EEPROM (and probably related devices).
 // to hack in missing features.
 //
 // See http://stm32duino.com/viewtopic.php?f=45&t=3322 
-// for more about hacking this device.
+// for more about hacking these devices
 // Latest code should be checked out with git sith something on the lones of... 
 //  git clone https://github.com/pingumacpenguin/SOR-T-SOR-R-Dosimeter-24C16-EEROM-dumper-and-updater..git
 //
