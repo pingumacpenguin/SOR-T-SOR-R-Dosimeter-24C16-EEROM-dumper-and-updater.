@@ -47,7 +47,34 @@
 // WARNING: Do not leave the battery in the dosimeter and accidentally power it from the STLINK V2 or the USB port at the same time, the battery will pop. 
 // Search Ebay for "SOIC8 SOP8 Flash Chip IC Test Clips Socket Adpter BIOS" or similar.
 
+// Include RTC for timestamps 
+#include "RTClock.h"
+RTClock rt (RTCSEL_LSE); // initialise
+uint32 tt;
+
+
+// Define the Base address of the RTC  registers (battery backed up CMOS Ram), so we can use them for config of touch screen and other calibration.
+// See http://stm32duino.com/viewtopic.php?f=15&t=132&hilit=rtc&start=40 for a more details about the RTC NVRam
+// 10x 16 bit registers are available on the STM32F103CXXX more on the higher density device.
+
+#define BKP_REG_BASE   (uint32_t *)(0x40006C00 +0x04)
+
+// Time library - https://github.com/PaulStoffregen/Time
+#include "Time.h"
+#define TZ    "BST"
 #include <Wire.h>
+
+// Somne sane ish defaults in case the RTC battery has been disconnected or run flat.
+int thisYear = 2015;
+int thisMonth = 6;
+int thisDay = 29;
+int lastDay = 0;
+int thisHour = 12;
+int thisMinute = 0;
+int thisSecond = 0;
+
+// Set to a recent value - 29th June 2015 12:25 (just after mid day)
+#define RESET_TO_TIMESTAMP 1435580711
 
 
 #define BLINK_PIN PC13   // Unused.. Can be used to assist with debugging. 
@@ -62,10 +89,16 @@
 void setup()
 {
 
-
+  // Check time, and set a sensible time, if this board has no battery, or the time is unset
+  long int tt = rt.getTime();
+  // Check to see if we are close to the epoch, and if so, bad things must have happened to the RTC backup power domain.
+  if ( tt < RESET_TO_TIMESTAMP )
+  {
+    rt.setTime(RESET_TO_TIMESTAMP);
+  }
 
   // Allow the USB to re-enumerate before we attempt to talk. You can probably shorten this delay considerably.
-  delay(30000);
+  delay(15000);
 
   // Using the BluePill, or other STM32F103XX boards, PB6 is SCL => Pin 6 on the 24C02
   //                                                  PB7 is SDA => Pin 5 on the 24C02
@@ -97,7 +130,7 @@ void loop()
 {
   byte error, address;
   int nDevices;
-
+  serialCurrentTime();
   Serial.println("//Scanning...");
 
   nDevices = 0;
@@ -111,6 +144,8 @@ void loop()
 
     if (error == 0)
     {
+      Serial.print("\n");
+      serialCurrentTime();
       Serial.print("\n// I2C device found at address 0x");
       if (address < 16) {
         Serial.print("0");
@@ -124,7 +159,7 @@ void loop()
 
       dump24c02(address);
 
-      delay(1000);
+      // delay(1000);
       nDevices++;
     }
     else if (error == 4)
@@ -143,11 +178,12 @@ void loop()
 
   // Put any changes to bytes immediately after the dump, since that will ensure they hit the found i2c device.
 
-  delay(5000);           // Wait 5 seconds then re-scan.
+  delay(60000);           // Wait n seconds then re-scan.
 }
 
 void dump24c02(byte i2cAddress)
 {
+  int hexDumpWidth = 0x10;
   int addrPointer = 0;
   //int romLength = 0xff;    // 24c02 - 256x8 bits (256 bytes)
   int romLength = 0xff;   // 24c04 - 512x8 bits (512 bytes)
@@ -162,7 +198,7 @@ void dump24c02(byte i2cAddress)
   while (addrPointer <= romLength)
   {
 
-    if ((addrPointer % 16) == 0 ) {
+    if ((addrPointer % hexDumpWidth) == 0 ) {
 
       if (addrPointer == 0) {
         Serial.print(" {");
@@ -192,7 +228,7 @@ void dump24c02(byte i2cAddress)
   Serial.print((i2cAddress - 0x50), HEX);
   Serial.println();
 
-  if (!(addrPointer % 16)) {
+  if (!(addrPointer % hexDumpWidth)) {
     Serial.println("};");
 
   } else {
@@ -230,5 +266,32 @@ void i2c_eeprom_write_byte( int deviceaddress, int eeaddress, byte data ) {
   Wire.write(rdata);
   Wire.endTransmission();
   //digitalWrite(BOARD_WP, HIGH);
+}
+
+void serialCurrentTime() {
+  long int tt = rt.getTime();
+  Serial.print("// Current time - ");
+  if (hour(tt) < 10) {
+    Serial.print("0");
+  }
+  Serial.print(hour(tt));
+  Serial.print(":");
+  if (minute(tt) < 10) {
+    Serial.print("0");
+  }
+  Serial.print(minute(tt));
+  Serial.print(":");
+  if (second(tt) < 10) {
+    Serial.print("0");
+  }
+  Serial.print(second(tt));
+  Serial.print(" ");
+  Serial.print(day(tt));
+  Serial.print("/");
+  Serial.print(month(tt));
+  Serial.print("/");
+  Serial.print(year(tt));
+  Serial.println("("TZ")");
+
 }
 
